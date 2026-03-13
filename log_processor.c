@@ -1,5 +1,6 @@
 #include "log_processor.h"
 
+// Bloquea un mutex dependiendo del sistema operativo
 static void lock_mutex(mutex_t *m) {
 #ifdef _WIN32
     EnterCriticalSection(m);
@@ -8,6 +9,7 @@ static void lock_mutex(mutex_t *m) {
 #endif
 }
 
+// Desbloquea un mutex dependiendo del sistema operativo
 static void unlock_mutex(mutex_t *m) {
 #ifdef _WIN32
     LeaveCriticalSection(m);
@@ -16,6 +18,7 @@ static void unlock_mutex(mutex_t *m) {
 #endif
 }
 
+// Inicializa las estructuras de estadísticas y los locks
 void init_stats(LogStats *stats) {
     stats->ip_table = NULL;
     stats->url_table = NULL;
@@ -30,7 +33,7 @@ void init_stats(LogStats *stats) {
 #endif
 }
 
-
+// Libera memoria usada por las hash tables y destruye los locks
 void destroy_stats(LogStats *stats) {
     IPEntry *ip_curr, *ip_tmp;
     URLEntry *url_curr, *url_tmp;
@@ -53,6 +56,7 @@ void destroy_stats(LogStats *stats) {
 #endif
 }
 
+// Extrae la IP, la URL y el status code de una línea del log
 void parse_log_line(const char *line, char *ip_out, char *url_out, int *status_out) {
     char method[32];
     char timestamp[128];
@@ -60,6 +64,7 @@ void parse_log_line(const char *line, char *ip_out, char *url_out, int *status_o
     sscanf(line,"%63s - - [%127[^]]] \"%31s %255[^\"]\" %d",ip_out,timestamp,method,url_out,status_out);
 }
 
+// Incrementa el contador de una IP en la tabla hash
 static void increment_ip(LogStats *stats, const char *ip) {
     IPEntry *entry = NULL;
     HASH_FIND_STR(stats->ip_table, ip, entry);
@@ -75,6 +80,7 @@ static void increment_ip(LogStats *stats, const char *ip) {
     }
 }
 
+// Incrementa el contador de una URL en la tabla hash
 static void increment_url(LogStats *stats, const char *url) {
     URLEntry *entry = NULL;
     HASH_FIND_STR(stats->url_table, url, entry);
@@ -90,6 +96,7 @@ static void increment_url(LogStats *stats, const char *url) {
     }
 }
 
+// Procesa una línea del log y actualiza las estadísticas
 void process_log_line(LogStats *stats, const char *line) {
     char ip[MAX_IP_LEN];
     char url[MAX_URL_LEN];
@@ -109,6 +116,7 @@ void process_log_line(LogStats *stats, const char *line) {
     unlock_mutex(&stats->stats_lock);
 }
 
+// Lee una línea del archivo log, la procesa y la elimina del archivo
 int consume_one_log_entry(const char *filename, LogStats *stats) {
     lock_mutex(&stats->file_lock);
 
@@ -153,6 +161,7 @@ int consume_one_log_entry(const char *filename, LogStats *stats) {
     return 1;
 }
 
+// Imprime algunas estadísticas calculadas a partir del log
 void print_stats(const LogStats *stats) {
     printf("IPs unicas: %u\n", HASH_COUNT(stats->ip_table));
     printf("Errores HTTP (400-599): %d\n", stats->http_errors);
